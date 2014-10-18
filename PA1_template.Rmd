@@ -1,25 +1,120 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
 output: 
-  html_document:
+  html_document: 
     keep_md: true
 ---
+In this analysis, we are studying the measurement made by smartphone
+of the number of steps taken during the day by the owner of the device. 
 
+The set of Observations is over 61 days, counting each 288 intervals of 5 minutes
+during which the number of steps is recorded. 
 
 ## Loading and preprocessing the data
+```{r}
+RawData <- read.csv("activity.csv")
+``` 
+A quick look at the data : 
+```{r}
+str(RawData)
+```
+I decided to use real dates and to remove all the NAs from steps :
+```{r clean data }
+bad <- !is.na(RawData$steps)
+RawData$date <- as.Date(as.character(RawData$date), "%Y-%m-%d")
+Data <- RawData[bad,]
+```
 
+A quick look at the cleaned data : 
+```{r cleaned data }
+str(Data)
+```
 
+Let us note that apparently we only removed 8 days from the total raw data so the intervals are consistents, we are left with 53 days. 
 
 ## What is mean total number of steps taken per day?
+In this part we are going to study the primary patterns in the data, namely the number of steps per day. 
 
+```{r firts part}
+sumPerDay <- tapply(Data$steps, Data$date, sum)
+```
+The results are : 
+```{r plot }
+hist(sumPerDay, main ="Histogram of the number of Steps per Day", xlab = "Number of steps per day")
+``` 
+
+```{r}
+mean(sumPerDay)
+median(sumPerDay)
+```
 
 
 ## What is the average daily activity pattern?
-
-
+Let us compute the data : 
+```{r}
+meanPerInterval <- tapply(Data$steps, Data$interval, mean)
+head(meanPerInterval)
+```
+Here is the pattern, we notice a strong pic around the 110 interval and a very flat 
+part in the first 70 intervals 
+```{r}
+plot(meanPerInterval, type ="l", main = "Number of steps pattern over Intervals", ylab = "Mean of the number of steps")
+```
 
 ## Imputing missing values
+Number of missing data : 
+```{r}
+sum(bad)
+```
 
+Let us replace the missing values with the mean for this given interval 
+```{r}
+NaAdjustedData <- RawData
+NaAdjustedData$date <- as.Date(as.character(NaAdjustedData$date), "%Y-%m-%d")
+
+
+for (i in 1:length(RawData$steps))
+  if(bad[i] == FALSE)
+    NaAdjustedData$steps[i] = meanPerInterval[as.character(NaAdjustedData$interval[i])]
+
+NaAdsumPerDay <- tapply(NaAdjustedData$steps, NaAdjustedData$date, sum)
+str(NaAdsumPerDay)
+```
+
+```{r plot1}
+## Plot 
+hist(NaAdsumPerDay, main ="Histogram of the number of Steps per Day Na Adjusted", xlab = "Number of steps per day, NAs were \n replaced by the mean on the interval")
+```
+
+We observe a much stronger average in deed replcing the missing values with the averge we added a lot of record containing average values which induced a much greater frequency for this record. 
+
+```{r}
+mean(NaAdsumPerDay)
+median(NaAdsumPerDay)  
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Lets study the weekday vs weekend patterns, we are creating a new variable registering this :  
+```{r}
+typeDay = factor(c("weekday","weekend"))
+
+for (i in 1:length(NaAdjustedData$date))
+  if (weekdays(NaAdjustedData$date[i]) == "dimanche" 
+        | weekdays(NaAdjustedData$date[i]) == "samedi")
+        typeDay[i] = "weekend"  else typeDay[i] = "weekday"
+
+meanPerTypeDay <- aggregate(NaAdjustedData$steps,list(typeDay,NaAdjustedData$interval), mean)
+meanPerTypeWeekDayInterval = subset(meanPerTypeDay, meanPerTypeDay$Group.1 == "weekday")
+meanPerTypeWeekEndInterval = subset(meanPerTypeDay, meanPerTypeDay$Group.1 == "weekend")
+``` 
+Please note  that I have a french version of the weekdays packages so I need to use the french names of the weekdays ! 
+
+```{r plot2panel}
+par(mfrow = c(2,1), mar = c(3,4,1,1))
+plot(meanPerTypeWeekDayInterval$x ~ meanPerTypeWeekDayInterval$Group.2, type = "l", main = "WeekDay average over Indexes", ylab = "steps mean")
+plot(meanPerTypeWeekEndInterval$x ~ meanPerTypeWeekEndInterval$Group.2, type = "l", main = "WeekEnd average over Indexes", ylab = "steps mean")
+```
+
+We notice a more equaly reparted average during the weekend. 
